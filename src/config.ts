@@ -19,6 +19,7 @@ export const APP_CONFIG = {
     TASKS: 'smart_tasks_data',
     AI_CONFIG: 'smart_tasks_ai_config',
     TASK_HISTORY: 'smart_tasks_history',
+    WEBDAV_CONFIG: 'smart_tasks_webdav_config',
   },
 
   // 动画配置

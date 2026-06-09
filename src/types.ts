@@ -21,6 +21,15 @@ export interface AIConfig {
   model: string;
 }
 
+export interface WebDAVConfig {
+  enabled: boolean;
+  url: string;
+  username: string;
+  password: string;
+  filePath: string;
+  autoSync: boolean;
+}
+
 export interface AIActionResponse {
   success: boolean;
   action: 'add' | 'update' | 'update_many' | 'delete' | 'batch' | 'none';

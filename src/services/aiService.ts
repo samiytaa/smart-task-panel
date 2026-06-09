@@ -9,6 +9,258 @@ const EDIT_INTENT_REGEX =
   /(修改|改成|改为|改下|更新|编辑|调整|完善|补充|重命名|rename|update|edit|设置|设为|标记|完成|改标题|改描述|改优先级|改截止|改标签|清空|删除标签|去掉标签)/i;
 const MULTI_EDIT_INTENT_REGEX =
   /(除了|除开|其余|其他|全部|所有|批量|统一|都改|都设置|全部改|所有任务)/i;
+const DELETE_INTENT_REGEX = /(删除|移除|删掉|去掉这个任务|remove|delete)/i;
+const CREATE_INTENT_REGEX =
+  /(新增|添加|创建|增加|记下|记录|安排|加入|add|create|append|todo|待办|任务[:：]?)/i;
+const TITLE_SPLIT_REGEX = /\r?\n+|[；;]+|(?:、(?=\S))/g;
+const SHARED_FIELD_PATTERNS = {
+  dueDate:
+    /(?:截止(?:日期|时间)?|到期(?:日期|时间)?|due(?:\s+date)?|在)\s*(?:是|为)?\s*((?:20\d{2}[-/.年]\d{1,2}[-/.月]\d{1,2}日?)|今天|明天|后天)/i,
+  description:
+    /(?:描述|说明|备注|内容)\s*(?:是|为|[:：])\s*["“]?([^"”]+?)["”]?(?=(?:[,，；;。]|(?:标签|优先级|截止|到期|状态))|$)/i,
+  tags:
+    /(?:标签|tag(?:s)?)\s*(?:是|为|[:：]|加上|添加)?\s*["“]?([^"”]+?)["”]?(?=(?:[；;。]|(?:优先级|截止|到期|描述|说明|备注|状态))|$)/i,
+  priority:
+    /(?:(高|中|低)(?:优先级)?|优先级\s*(?:是|为)?\s*(高|中|低|high|medium|low)|(?:priority)\s*(?:is|=|:)?\s*(high|medium|low))/i,
+  status:
+    /(标记为已完成|标记成已完成|设为已完成|状态为已完成|已完成|完成|标记为待办|设为待办|恢复进行中|未完成|pending|completed)/i,
+};
+
+const normalizeDateToken = (raw: string | undefined) => {
+  if (!raw) {
+    return undefined;
+  }
+
+  const token = raw.trim();
+  const today = new Date();
+
+  if (token === '今天') {
+    return today.toISOString().slice(0, 10);
+  }
+
+  if (token === '明天') {
+    return new Date(today.getTime() + 24 * 3600 * 1000).toISOString().slice(0, 10);
+  }
+
+  if (token === '后天') {
+    return new Date(today.getTime() + 2 * 24 * 3600 * 1000).toISOString().slice(0, 10);
+  }
+
+  const normalized = token
+    .replace(/年|[/.]/g, '-')
+    .replace(/月/g, '-')
+    .replace(/日/g, '')
+    .trim();
+
+  const parts = normalized.split('-').filter(Boolean);
+  if (parts.length !== 3) {
+    return undefined;
+  }
+
+  const [year, month, day] = parts;
+  return `${year.padStart(4, '0')}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+};
+
+const normalizePriority = (raw: string | undefined): Task['priority'] | undefined => {
+  if (!raw) {
+    return undefined;
+  }
+
+  if (/高|high/i.test(raw)) {
+    return 'high';
+  }
+
+  if (/低|low/i.test(raw)) {
+    return 'low';
+  }
+
+  if (/中|medium/i.test(raw)) {
+    return 'medium';
+  }
+
+  return undefined;
+};
+
+const normalizeStatus = (raw: string | undefined): Task['status'] | undefined => {
+  if (!raw) {
+    return undefined;
+  }
+
+  if (/已完成|完成|completed/i.test(raw)) {
+    return 'completed';
+  }
+
+  if (/待办|未完成|pending|进行中/i.test(raw)) {
+    return 'pending';
+  }
+
+  return undefined;
+};
+
+const normalizeTags = (raw: string | undefined) => {
+  if (!raw) {
+    return [] as string[];
+  }
+
+  return raw
+    .split(/[，,、/|]/)
+    .map((tag) => tag.trim().replace(/^#/, ''))
+    .filter(Boolean);
+};
+
+const cleanupTaskTitle = (raw: string) =>
+  raw
+    .replace(/^(新增|添加|创建|增加|记下|记录|安排|加入)(?:一个|一条|条|个)?(?:任务)?[:：]?\s*/i, '')
+    .replace(/^任务[:：]\s*/i, '')
+    .replace(/^(请|帮我|帮忙)\s*/i, '')
+    .replace(/["“”]/g, '')
+    .replace(/[。；;，,]+$/g, '')
+    .trim();
+
+const stripSharedFieldSegments = (input: string) =>
+  input
+    .replace(SHARED_FIELD_PATTERNS.dueDate, '')
+    .replace(SHARED_FIELD_PATTERNS.description, '')
+    .replace(SHARED_FIELD_PATTERNS.tags, '')
+    .replace(SHARED_FIELD_PATTERNS.priority, '')
+    .replace(SHARED_FIELD_PATTERNS.status, '')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
+
+const extractSharedCreateFields = (instruction: string) => {
+  const dueDateMatch = instruction.match(SHARED_FIELD_PATTERNS.dueDate);
+  const descriptionMatch = instruction.match(SHARED_FIELD_PATTERNS.description);
+  const tagsMatch = instruction.match(SHARED_FIELD_PATTERNS.tags);
+  const priorityMatch = instruction.match(SHARED_FIELD_PATTERNS.priority);
+  const statusMatch = instruction.match(SHARED_FIELD_PATTERNS.status);
+
+  return {
+    dueDate: normalizeDateToken(dueDateMatch?.[1]),
+    description: descriptionMatch?.[1]?.trim(),
+    tags: normalizeTags(tagsMatch?.[1]),
+    priority: normalizePriority(priorityMatch?.[1] || priorityMatch?.[2] || priorityMatch?.[3]),
+    status: normalizeStatus(statusMatch?.[1]),
+  };
+};
+
+const splitCreateTitles = (instruction: string) => {
+  const stripped = instruction
+    .replace(/^(请|帮我|帮忙)\s*/i, '')
+    .replace(/^(新增|添加|创建|增加|记下|记录|安排|加入)(?:一个|一条|条|个)?(?:任务)?[:：]?\s*/i, '')
+    .trim();
+
+  const listSource = (stripped.includes('：') ? stripped.split('：').slice(-1)[0] : stripped).trim();
+  const metadataIndex = listSource.search(/[，,\s]*(?:描述|说明|备注|标签|优先级|截止|到期|状态)/i);
+  const titleOnlySource = (metadataIndex >= 0 ? listSource.slice(0, metadataIndex) : listSource).trim();
+  const cleanedSource = stripSharedFieldSegments(titleOnlySource);
+  const candidates = cleanedSource
+    .split(TITLE_SPLIT_REGEX)
+    .flatMap((segment) => segment.split(/(?:^|[，,])\s*(?=(?:第?\d+[.、]|[-*•]))/))
+    .map((segment) =>
+      segment
+        .replace(/^(?:第?\d+[.、)]|[-*•])\s*/g, '')
+        .trim()
+    )
+    .filter(Boolean);
+
+  if (candidates.length > 1) {
+    return candidates.map(cleanupTaskTitle).filter(Boolean);
+  }
+
+  const commaSeparated = cleanedSource
+    .split(/[，,]/)
+    .map((segment) => cleanupTaskTitle(segment))
+    .filter(Boolean);
+
+  if (commaSeparated.length > 1 && !/(描述|说明|备注|标签|优先级|截止|到期|状态)/.test(instruction)) {
+    return commaSeparated;
+  }
+
+  return [cleanupTaskTitle(cleanedSource)].filter(Boolean);
+};
+
+const buildLocalCreateAction = (instruction: string): AIActionResponse | null => {
+  const fields = extractSharedCreateFields(instruction);
+  const titles = splitCreateTitles(instruction);
+
+  if (titles.length === 0) {
+    return null;
+  }
+
+  const tasks = titles.map((title) => ({
+    title,
+    description: fields.description ?? null,
+    priority: fields.priority ?? 'medium',
+    status: fields.status ?? 'pending',
+    dueDate: fields.dueDate ?? null,
+    tags: fields.tags,
+  }));
+
+  if (tasks.length === 1) {
+    return {
+      success: true,
+      action: 'add',
+      message: `已识别为新增任务：${tasks[0].title}`,
+      task: tasks[0],
+    };
+  }
+
+  return {
+    success: true,
+    action: 'batch',
+    message: `已识别为批量新增 ${tasks.length} 条任务`,
+    tasks,
+  };
+};
+
+const shouldUseLocalCreateParser = (instruction: string, tasks: Task[]) => {
+  const trimmed = instruction.trim();
+  if (!trimmed) {
+    return false;
+  }
+
+  if (EDIT_INTENT_REGEX.test(trimmed) || DELETE_INTENT_REGEX.test(trimmed)) {
+    return false;
+  }
+
+  if (CREATE_INTENT_REGEX.test(trimmed)) {
+    return true;
+  }
+
+  return tasks.length === 0;
+};
+
+const sanitizeAIResponse = (
+  parsed: AIActionResponse,
+  instruction: string,
+  tasks: Task[]
+): AIActionResponse => {
+  if (parsed.action === 'add' || parsed.action === 'batch') {
+    const localCreate = buildLocalCreateAction(instruction);
+    if (localCreate) {
+      return localCreate;
+    }
+  }
+
+  if (parsed.action === 'update' && typeof parsed.taskId !== 'number' && parsed.task?.id) {
+    return {
+      ...parsed,
+      taskId: parsed.task.id,
+    };
+  }
+
+  if (parsed.action === 'delete' && typeof parsed.taskId !== 'number') {
+    const matchedTask = tasks.find((task) => parsed.task?.id === task.id);
+    if (matchedTask) {
+      return {
+        ...parsed,
+        taskId: matchedTask.id,
+      };
+    }
+  }
+
+  return parsed;
+};
 
 const buildTaskContext = (tasks: Task[]) => {
   if (!Array.isArray(tasks) || tasks.length === 0) {
@@ -324,6 +576,13 @@ export async function parseTaskInstruction(
     throw new Error('指令不能为空');
   }
 
+  if (shouldUseLocalCreateParser(instruction, tasks)) {
+    const localCreate = buildLocalCreateAction(instruction);
+    if (localCreate) {
+      return localCreate;
+    }
+  }
+
   // 统一使用 OpenAI 兼容 API
   // 如果用户选择 built-in，需要先配置为指向实际的 API
   if (aiConfig.provider === 'built-in') {
@@ -335,5 +594,6 @@ export async function parseTaskInstruction(
     }
   }
 
-  return await callOpenAICompatibleAPI(instruction, tasks, aiConfig);
+  const parsed = await callOpenAICompatibleAPI(instruction, tasks, aiConfig);
+  return sanitizeAIResponse(parsed, instruction, tasks);
 }

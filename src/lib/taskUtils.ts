@@ -129,19 +129,24 @@ export const applyParsedActionToTasks = (
   switch (parsedResponse.action) {
     case 'add':
       if (parsedResponse.task) {
-        updatedTasks = [
-          ...updatedTasks,
+        const normalizedAddedTask = normalizeTask(
           {
+            ...parsedResponse.task,
             id: nextIdVal,
             title: parsedResponse.task.title || 'AI 新增',
             description: parsedResponse.task.description ?? undefined,
             priority: parsedResponse.task.priority || 'medium',
             status: parsedResponse.task.status || 'pending',
             dueDate: parsedResponse.task.dueDate ?? undefined,
-            tags: parsedResponse.task.tags || [],
+            tags: parsedResponse.task.tags ?? [],
             createdAt: new Date().toISOString(),
           },
-        ];
+          nextIdVal
+        );
+
+        if (normalizedAddedTask) {
+          updatedTasks = [...updatedTasks, normalizedAddedTask];
+        }
       }
       break;
 
@@ -218,16 +223,24 @@ export const applyParsedActionToTasks = (
         let cursorId = nextIdVal;
         updatedTasks = [
           ...updatedTasks,
-          ...parsedResponse.tasks.map((task) => ({
-            id: cursorId++,
-            title: task.title || '智能节点',
-            description: task.description,
-            priority: task.priority || 'medium',
-            status: task.status || 'pending',
-            dueDate: task.dueDate,
-            tags: task.tags || [],
-            createdAt: task.createdAt || new Date().toISOString(),
-          })),
+          ...parsedResponse.tasks
+            .map((task) =>
+              normalizeTask(
+                {
+                  ...task,
+                  id: cursorId++,
+                  title: task.title || '智能节点',
+                  description: task.description ?? undefined,
+                  priority: task.priority || 'medium',
+                  status: task.status || 'pending',
+                  dueDate: task.dueDate ?? undefined,
+                  tags: task.tags ?? [],
+                  createdAt: task.createdAt || new Date().toISOString(),
+                },
+                cursorId - 1
+              )
+            )
+            .filter((task): task is Task => task !== null),
         ];
       }
       break;
