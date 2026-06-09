@@ -3,6 +3,7 @@ import {
   Download,
   Upload,
   Settings,
+  CheckSquare,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { TAG_STATUS_FILTERS, UI_TEXT } from '../config';
@@ -27,6 +28,7 @@ interface ManagementPanelProps {
   onExportTasks: () => void;
   onOpenImportDialog: () => void;
   onOpenConfig: () => void;
+  onOpenBulkAction: () => void;
 }
 
 export function ManagementPanel({
@@ -40,6 +42,7 @@ export function ManagementPanel({
   onExportTasks,
   onOpenImportDialog,
   onOpenConfig,
+  onOpenBulkAction,
 }: ManagementPanelProps) {
   const tagSummaries = Array.from(new Set(tasks.flatMap((task) => task.tags ?? [])))
     .map<TagSummary>((tag) => {
@@ -196,7 +199,19 @@ export function ManagementPanel({
             </div>
 
             <div className="border-t border-rose-100/80 px-3.5 py-2 sm:px-5 sm:py-2.5">
-              <div className="flex items-center justify-center gap-6 sm:gap-8">
+              <div className="flex items-center justify-center gap-5 sm:gap-7">
+                <button
+                  type="button"
+                  onClick={() => {
+                    onClose();
+                    onOpenBulkAction();
+                  }}
+                  className="mobile-touch-target flex h-8 w-8 shrink-0 cursor-pointer items-center justify-center text-rose-400 transition-all hover:text-rose-500 active:scale-95"
+                  title="批量操作"
+                  aria-label="批量操作"
+                >
+                  <CheckSquare className="h-5 w-5 stroke-[2.2]" />
+                </button>
                 <button
                   type="button"
                   onClick={onOpenConfig}

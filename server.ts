@@ -130,7 +130,7 @@ Return raw JSON only.`;
 const getBuiltInAI = () => {
   const apiKey = process.env.GEMINI_API_KEY;
   if (!apiKey) {
-    throw new Error('GEMINI_API_KEY is not defined in environment variables');
+    throw new Error('GEMINI_API_KEY 未设置。请在 .env 文件中配置 GEMINI_API_KEY，或者在 AI 配置中使用自定义 API。');
   }
 
   return new GoogleGenAI({
@@ -152,11 +152,10 @@ app.post('/api/ai/parse', async (req, res) => {
     const {instruction, tasks, aiConfig} = req.body;
 
     if (!instruction || typeof instruction !== 'string') {
-      res.status(400).json({
+      return res.status(400).json({
         success: false,
         message: 'Instruction is required and must be a string.',
       });
-      return;
     }
 
     const contextTasks = tasks || [];
@@ -329,11 +328,10 @@ Return raw JSON only.`;
       const customModel = aiConfig.model || 'gpt-3.5-turbo';
 
       if (!customKey) {
-        res.status(400).json({
+        return res.status(400).json({
           success: false,
           message: 'Custom API Key is required when Custom provider is selected.',
         });
-        return;
       }
 
       console.log(`Forwarding task parsing to custom AI: ${customModel} via ${customUrl}`);

@@ -1,6 +1,6 @@
 # Smart Task Panel
 
-智能任务面板，用自然语言管理任务。
+智能任务面板，用自然语言管理任务。**纯静态网站，无需后端服务器**。
 
 ## 核心功能
 
@@ -13,24 +13,7 @@
 - 自然语言解析任务命令（新增/更新/删除/批量操作）
 - 操作预览与确认机制
 - 风险检测（误删、大批量变更）
-- 支持 Gemini 或自定义 OpenAI 兼容接口
-
-## 快速开始
-
-需要 Node.js。
-
-```bash
-# 安装依赖
-npm install
-
-# 配置 Gemini API Key（可选）
-echo GEMINI_API_KEY=your_key > .env.local
-
-# 启动开发服务
-npm run dev
-```
-
-访问 `http://localhost:3000`，在设置中配置 AI 后即可使用。
+- 支持任何 OpenAI 兼容 API（OpenAI、DeepSeek、Ollama、Claude 等）
 
 ## 在线访问
 
@@ -38,15 +21,49 @@ npm run dev
 
 📦 **GitHub 仓库**: https://github.com/samiytaa/smart-task-panel
 
-## 本地开发与部署
+**首次使用**：点击右上角设置图标，配置您的 AI API 即可开始使用。
 
-### 开发环境
+## AI 配置指南
+
+本应用支持任何兼容 OpenAI API 格式的服务：
+
+### 选项 1: OpenAI（推荐）
+- **Base URL**: `https://api.openai.com/v1`
+- **API Key**: 在 [OpenAI Platform](https://platform.openai.com/api-keys) 获取
+- **Model**: `gpt-4o-mini` 或 `gpt-3.5-turbo`
+
+### 选项 2: DeepSeek（便宜高效）
+- **Base URL**: `https://api.deepseek.com/v1`
+- **API Key**: 在 [DeepSeek Platform](https://platform.deepseek.com/) 获取
+- **Model**: `deepseek-chat`
+
+### 选项 3: Ollama（本地免费）
+1. 安装并启动 Ollama
+2. 配置：
+   - **Base URL**: `http://localhost:11434/v1`
+   - **API Key**: `ollama`（任意值）
+   - **Model**: `llama3` 或其他已安装的模型
+
+### 选项 4: 其他兼容服务
+任何支持 OpenAI Chat Completions API 格式的服务都可以使用。
+
+## 本地开发
+
+需要 Node.js。
+
 ```bash
-npm run build  # 构建前端和后端
-npm start      # 启动生产服务
+# 安装依赖
+npm install
+
+# 启动开发服务
+npm run dev
 ```
 
-### 更新和部署到 GitHub Pages
+访问 `http://localhost:3000`，在设置中配置 AI 后即可使用。
+
+## 部署
+
+### 自动部署到 GitHub Pages
 
 项目配置了自动部署，推送到 main 分支后会自动触发构建和部署。
 
@@ -64,14 +81,32 @@ npm start      # 启动生产服务
 
 **手动部署**:
 ```bash
-# 1. 提交更改
+# 1. 构建静态文件
+npm run build
+
+# 2. 提交更改
 git add .
 git commit -m "your message"
 
-# 2. 推送到 GitHub
+# 3. 推送到 GitHub
 git push origin main
 
-# 3. GitHub Actions 会自动构建和部署
+# 4. GitHub Actions 会自动部署
 ```
 
 部署大约需要 2-3 分钟，完成后访问: https://samiytaa.github.io/smart-task-panel/
+
+### 部署到其他静态托管服务
+
+构建后的静态文件在 `dist` 目录，可以部署到：
+- Vercel
+- Netlify
+- Cloudflare Pages
+- GitHub Pages
+- 或任何静态文件托管服务
+
+## 数据隐私
+
+- ✅ 所有任务数据保存在浏览器本地存储（localStorage）
+- ✅ AI API 调用直接从浏览器发起，不经过第三方服务器
+- ✅ API Key 保存在浏览器本地，不会上传到任何服务器

@@ -8,6 +8,7 @@ import { AlertCircle, ArrowUp, CheckCircle2, RefreshCw } from 'lucide-react';
 import { motion, AnimatePresence } from 'motion/react';
 import { AIActionResponse, AIConfig, Task } from '../types';
 import { UI_TEXT } from '../config';
+import { parseTaskInstruction } from '../services/aiService';
 
 interface AICenterProps {
   tasks: Task[];
@@ -34,7 +35,7 @@ export const AICenter: React.FC<AICenterProps> = ({ tasks, aiConfig, onApplyPars
     }, 3000);
 
     return () => window.clearTimeout(dismissTimer);
-  }, [error, lastResultMessage]);
+  }, [error, lastResultMessage, feedbackTime]);
 
   const handleCommandSubmit = async (textToSend: string) => {
     if (!textToSend.trim()) return;
@@ -44,22 +45,8 @@ export const AICenter: React.FC<AICenterProps> = ({ tasks, aiConfig, onApplyPars
     setFeedbackTime(null);
 
     try {
-      const response = await fetch('/api/ai/parse', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          instruction: textToSend,
-          tasks,
-          aiConfig,
-        }),
-      });
-
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        throw new Error(errData.message || `请求失败 (${response.status})`);
-      }
-
-      const result = await response.json();
+      const result = await parseTaskInstruction(textToSend, tasks, aiConfig);
+      
       if (!result.success && result.action === 'none') {
         setError(result.message || 'AI 无法理解该指令，请换一种方式表达。');
         setFeedbackTime(new Date().toLocaleTimeString('zh-CN', { hour12: false }));

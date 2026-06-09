@@ -9,6 +9,7 @@ import type { ChangeEvent } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { AICenter } from './components/AICenter';
 import { AIConfigModal } from './components/AIConfigModal';
+import { BulkActionModal } from './components/BulkActionModal';
 import { ImportExportModal } from './components/ImportExportModal';
 import { ManagementPanel } from './components/ManagementPanel';
 import { TaskForm } from './components/TaskForm';
@@ -38,6 +39,7 @@ export default function App() {
   const [sortBy, setSortBy] = useState<'created' | 'priority' | 'due'>('created');
   const [isSortMenuOpen, setIsSortMenuOpen] = useState(false);
   const [isManagementPanelOpen, setIsManagementPanelOpen] = useState(false);
+  const [isBulkActionModalOpen, setIsBulkActionModalOpen] = useState(false);
   const [selectedTaskIds, setSelectedTaskIds] = useState<number[]>([]);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [editingTask, setEditingTask] = useState<Task | null>(null);
@@ -165,6 +167,15 @@ export default function App() {
 
   const handleCloseManagementPanel = () => {
     setIsManagementPanelOpen(false);
+  };
+
+  const handleOpenBulkActionModal = () => {
+    setIsBulkActionModalOpen(true);
+  };
+
+  const handleCloseBulkActionModal = () => {
+    setIsBulkActionModalOpen(false);
+    setSelectedTaskIds([]);
   };
 
   const handleOpenNewForm = () => {
@@ -389,7 +400,7 @@ export default function App() {
     setSelectedTaskIds(bulkFilteredTasks.map((task) => task.id));
   };
 
-  const handleBulkUpdateStatus = (status: Task['status']) => {
+  const handleBulkUpdateStatusAndClose = (status: Task['status']) => {
     if (selectedTaskIds.length === 0) {
       return;
     }
@@ -397,10 +408,15 @@ export default function App() {
     handleSaveTasks(
       tasks.map((task) => (selectedTaskIds.includes(task.id) ? { ...task, status } : task))
     );
+    setSelectedTaskIds([]);
   };
 
   const handleBulkDelete = () => {
-    if (selectedTaskIds.length === 0 || !confirm(UI_TEXT.CONFIRM_BULK_DELETE)) {
+    if (selectedTaskIds.length === 0) {
+      return;
+    }
+
+    if (!confirm(UI_TEXT.CONFIRM_BULK_DELETE)) {
       return;
     }
 
@@ -448,6 +464,27 @@ export default function App() {
         onExportTasks={handleExportTasks}
         onOpenImportDialog={handleOpenImportModal}
         onOpenConfig={() => setIsConfigModalOpen(true)}
+        onOpenBulkAction={handleOpenBulkActionModal}
+      />
+
+      <BulkActionModal
+        isOpen={isBulkActionModalOpen}
+        tasks={tasks}
+        bulkStatusFilter={bulkStatusFilter}
+        setBulkStatusFilter={setBulkStatusFilter}
+        selectedTaskIds={selectedTaskIds}
+        bulkFilteredTasks={bulkFilteredTasks}
+        areAllFilteredTasksSelected={areAllFilteredTasksSelected}
+        hasSelectedPendingTasks={hasSelectedPendingTasks}
+        hasSelectedCompletedTasks={hasSelectedCompletedTasks}
+        onClose={handleCloseBulkActionModal}
+        onSelectAllFilteredTasks={handleSelectAllFilteredTasks}
+        onBulkUpdateStatusAndClose={handleBulkUpdateStatusAndClose}
+        onBulkDelete={handleBulkDelete}
+        onToggleTaskSelection={handleToggleTaskSelection}
+        onToggleStatus={handleToggleStatus}
+        onEditTask={handleOpenEditForm}
+        onDeleteTask={handleDeleteTask}
       />
 
       <main className="relative z-10 mx-auto flex w-full max-w-6xl flex-grow flex-col px-3 pt-[4.5rem] pb-0 transition-all duration-300 sm:px-4 sm:pt-[5rem] md:pt-[5.25rem]">

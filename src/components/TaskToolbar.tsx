@@ -88,11 +88,6 @@ export function TaskToolbar({
                       >
                         <div className="flex-1">
                           <p className="whitespace-nowrap text-sm font-extrabold leading-tight sm:text-[0.9375rem]">{option.label}</p>
-                          {option.description ? (
-                            <p className="mt-1 whitespace-nowrap text-[10.5px] font-semibold text-rose-400 sm:text-[11px]">
-                              {option.description}
-                            </p>
-                          ) : null}
                         </div>
                         <div className="flex h-4 w-4 shrink-0 items-center justify-center sm:h-4.5 sm:w-4.5">
                           {isActive ? <Check className="h-3.5 w-3.5 text-emerald-400 sm:h-4 sm:w-4" /> : null}
